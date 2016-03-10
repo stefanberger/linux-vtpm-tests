@@ -1,0 +1,14 @@
+Test suite for Linux vtpm driver
+
+You need at least the following packages installed:
+- automake
+- autoconf
+- gcc
+- sed
+
+To build and run it do:
+
+./bootstrap.sh
+./configure
+make
+make check

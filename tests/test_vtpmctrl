@@ -1,0 +1,66 @@
+#!/bin/bash
+
+# For the license, see the LICENSE file in the root directory.
+#set -x
+
+DIR=$(dirname "$0")
+ROOT=${DIR}/..
+VTPMCTRL=${ROOT}/src/vtpmctrl
+
+tmpdir=$(mktemp -d)
+vtpmctrllog=${tmpdir}/vtpmctrl.log
+vtpmctrlpid=0
+
+cleanup() {
+	rm -rf $tpmdir
+	kill -9 $vtpmctrlpid
+}
+
+trap "cleanup" EXIT
+
+if [ ! -x $VTPMCTRL ]; then
+	echo "vtpmctrl is missing at $VTPMCTRL."
+	exit 1
+fi
+
+if [ $(id -u) -ne 0 ]; then
+	echo "Test must be run as root"
+	exit 77
+fi
+
+if [ ! -c /dev/vtpmx ]; then
+	modprobe tpm_vtpm
+fi
+
+if [ ! -c /dev/vtpmx ]; then
+	echo "Missing vtpm driver."
+	exit 1
+fi
+
+$VTPMCTRL > $vtpmctrllog &
+vtpmctrlpid=$!
+sleep 1
+
+tpmdev=$(cat $vtpmctrllog | sed -n 's/.* \(\/dev\/tpm[0-9]\+\);.*/\1/p')
+
+if [ ! -c $tpmdev ]; then
+	echo "Error: TPM device $tpmdev does not exist."
+	exit 1
+fi
+
+exec 100<>$tpmdev
+
+/bin/echo -en '\x00\xc1\x00\x00\x00\x0a\x00\x00\x00\x00' >&100
+res=$(od -t x1 -An <&100)
+
+exp=" 00 c4 00 00 00 0a 00 00 00 00"
+if [ "$res" != "$exp" ]; then
+	echo "Error: Expected result different from actual result."
+	echo "       actual:   $res"
+	echo "       expected: $exp"
+	exit 1
+fi
+
+echo "OK"
+
+exit 0
