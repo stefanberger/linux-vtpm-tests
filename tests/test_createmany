@@ -11,7 +11,7 @@ tmpdir=$(mktemp -d)
 vtpmctrlpid=0
 
 cleanup() {
-	rm -rf $tpmdir
+	rm -rf $tmpdir
 	trap - SIGTERM
 	kill $(jobs -p)
 }

@@ -12,7 +12,7 @@ vtpmctrllog=${tmpdir}/vtpmctrl.log
 vtpmctrlpid=0
 
 cleanup() {
-	rm -rf $tpmdir
+	rm -rf $tmpdir
 	kill -9 $vtpmctrlpid
 }
 
