@@ -40,14 +40,17 @@ if [ ! -c /dev/vtpmx ]; then
 	exit 1
 fi
 
-for ((i = 0; i < 1000; i++)); do
+# This test runs a lot slower due to sleep to wait for
+# device to appear. So we create less devices in this test.
+for ((i = 0; i < 400; i++)); do
 	vtpmctrllog=$tmpdir/vtpmctrl.log.${i}
 	$VTPMCTRL > $vtpmctrllog &
+	echo -n "$!" > $tmpdir/vtpmctrl.pid.${i}
 done
 
 sleep 1
 
-for ((i = 0; i < 1000; i++)); do
+for ((i = 0; i < 400; i++)); do
 	vtpmctrllog=$tmpdir/vtpmctrl.log.${i}
 	tpmdev=$(cat $vtpmctrllog | sed -n 's/.* \(\/dev\/tpm[0-9]\+\);.*/\1/p')
 
@@ -71,6 +74,31 @@ for ((i = 0; i < 1000; i++)); do
 		echo "       expected: $exp"
 		exit 1
 	fi
+
+	res=$(cat /sys/devices/virtual/tpm/${tpmdev##/dev/}/durations)
+	exp="66000 132000 197000 [original]"
+	if [ "$res" != "$exp" ]; then
+		echo "Error: Expected durations different from actual ones."
+		echo "       actual:   $res"
+		echo "       expected: $exp"
+		exit 1
+	fi
+
+	kill -9 $(cat $tmpdir/vtpmctrl.pid.${i})
+	for ((j = 0; j < 10; j++)); do
+		# wait for device to disappear
+		if [ ! -c $tpmdev ]; then
+			break;
+		fi
+		sleep 0.02
+	done
+
+	if [ -c $tpmdev ]; then
+		echo "Client device $tpmdev is still there."
+		exit 1
+	fi
+
+	exec 100>&-
 	echo " OK "
 done
 

@@ -8,4 +8,5 @@ check_PROGRAMS =
 
 TESTS = \
 	test_createmany \
+	test_createmany_checkclose \
 	test_vtpmctrl

@@ -8,6 +8,11 @@ ROOT=${DIR}/..
 VTPMCTRL=${ROOT}/src/vtpmctrl
 
 tmpdir=$(mktemp -d)
+if [ $? -ne 0 ] || [ -z "$tmpdir" ]; then
+	echo "Error: Could not create temporary directory."
+	exit 1
+fi
+
 vtpmctrllog=${tmpdir}/vtpmctrl.log
 vtpmctrlpid=0
 
