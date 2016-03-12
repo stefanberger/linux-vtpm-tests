@@ -36,7 +36,6 @@
  */
 
 
-#include <linux/vtpm.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -49,10 +48,12 @@
 #include <endian.h>
 #include <stdint.h>
 
+#include <linux/vtpm_proxy.h>
+
 int vtpmctrl_create(void)
 {
 	int fd, n, option, li, serverfd, nn;
-	struct vtpm_ioctl_new_dev vtpm_new_dev = {
+	struct vtpm_proxy_new_dev vtpm_new_dev = {
 		.flags = 0,
 	};
 	char tpmdev[16];
@@ -95,7 +96,7 @@ int vtpmctrl_create(void)
 		return 1;
 	}
 
-	n = ioctl(fd, VTPM_IOC_NEW_DEV, &vtpm_new_dev);
+	n = ioctl(fd, VTPM_PROXY_IOC_NEW_DEV, &vtpm_new_dev);
 	if (n != 0) {
 		perror("ioctl to create new device failed");
 		close(fd);
