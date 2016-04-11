@@ -1,0 +1,105 @@
+#!/bin/bash
+
+# For the license, see the LICENSE file in the root directory.
+#set -x
+
+DIR=$(dirname "$0")
+ROOT=${DIR}/..
+VTPMCTRL=${ROOT}/src/vtpmctrl
+
+tmpdir=$(mktemp -d)
+if [ $? -ne 0 ] || [ -z "$tmpdir" ]; then
+	echo "Error: Could not create temporary directory."
+	exit 1
+fi
+
+cleanup() {
+	rm -rf $tmpdir
+	trap - SIGTERM
+	kill $(jobs -p)
+}
+
+trap "cleanup" EXIT
+
+if [ ! -x $VTPMCTRL ]; then
+	echo "vtpmctrl is missing at $VTPMCTRL."
+	exit 1
+fi
+
+if [ $(id -u) -ne 0 ]; then
+	echo "Test must be run as root"
+	exit 77
+fi
+
+if [ ! -c /dev/vtpmx ]; then
+	modprobe tpm_vtpm_proxy
+fi
+
+if [ ! -c /dev/vtpmx ]; then
+	echo "Missing vtpm driver."
+	exit 1
+fi
+
+# This test runs a lot slower due to sleep to wait for
+# device to appear. So we create less devices in this test.
+for ((i = 0; i < 400; i++)); do
+	vtpmctrllog=$tmpdir/vtpmctrl.log.${i}
+	$VTPMCTRL --tpm2 > $vtpmctrllog &
+	echo -n "$!" > $tmpdir/vtpmctrl.pid.${i}
+done
+
+sleep 1
+
+for ((i = 0; i < 400; i++)); do
+	vtpmctrllog=$tmpdir/vtpmctrl.log.${i}
+	tpmdev=$(cat $vtpmctrllog | sed -n 's/.* \(\/dev\/tpm[0-9]\+\);.*/\1/p')
+
+	# test the device
+	if [ ! -c $tpmdev ]; then
+		echo "Error: TPM device $tpmdev does not exist."
+		exit 1
+	fi
+
+	echo -n "$tpmdev "
+
+	exec 100<>$tpmdev
+
+	/bin/echo -en '\x80\x01\x00\x00\x00\x0a\x00\x00\x00\x00' >&100
+	res=$(od -t x1 -An <&100)
+
+	exp=" 80 01 00 00 00 0a 00 00 00 00"
+	if [ "$res" != "$exp" ]; then
+		echo "Error: Expected result different from actual result."
+		echo "       actual:   $res"
+		echo "       expected: $exp"
+		exit 1
+	fi
+
+	# The following should not work
+	res=$(cat /sys/devices/virtual/tpm/${tpmdev##/dev/}/durations 2>&1)
+	if [ $? -eq 0 ]; then
+		echo "Error: TPM2 should not have a durations sysfs entry."
+		exit 1
+	fi
+
+	kill -9 $(cat $tmpdir/vtpmctrl.pid.${i})
+	for ((j = 0; j < 10; j++)); do
+		# wait for device to disappear
+		if [ ! -c $tpmdev ]; then
+			break;
+		fi
+		sleep 0.02
+	done
+
+	if [ -c $tpmdev ]; then
+		echo "Client device $tpmdev is still there."
+		exit 1
+	fi
+
+	exec 100>&-
+	echo " OK "
+done
+
+echo "OK"
+
+exit 0

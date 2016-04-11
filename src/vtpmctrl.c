@@ -54,8 +54,9 @@
 #define TPM_ORD_STARTUP        0x00000099
 #define TPM_ORD_GETCAPABILITY  0x00000065
 
+#define TPM2_CC_STARTUP        0x00000144
 
-int vtpmctrl_create(bool exit_on_user_request)
+int vtpmctrl_create(bool exit_on_user_request, bool is_tpm2)
 {
 	int fd, n, option, li, serverfd, nn;
 	struct vtpm_proxy_new_dev vtpm_new_dev = {
@@ -65,6 +66,9 @@ int vtpmctrl_create(bool exit_on_user_request)
 	unsigned char buffer[4096];
 	const unsigned char tpm_success_resp[] = {
 		0x00, 0xc4, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00
+	};
+	const unsigned char tpm2_success_resp[] = {
+		0x80, 0x01, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00
 	};
 	const unsigned char timeout_req[] = {
 		0x00, 0xc1, 0x00, 0x00, 0x00, 0x16, 0x00, 0x00, 0x00, 0x65,
@@ -101,6 +105,9 @@ int vtpmctrl_create(bool exit_on_user_request)
 		perror("Could not open /dev/vtpmx");
 		return 1;
 	}
+
+	if (is_tpm2)
+		vtpm_new_dev.flags |= VTPM_PROXY_FLAG_TPM2;
 
 	n = ioctl(fd, VTPM_PROXY_IOC_NEW_DEV, &vtpm_new_dev);
 	if (n != 0) {
@@ -143,6 +150,10 @@ int vtpmctrl_create(bool exit_on_user_request)
 			case TPM_ORD_STARTUP:
 				n = write(serverfd, tpm_success_resp, sizeof(tpm_success_resp));
 				break;
+			case TPM2_CC_STARTUP:
+				n = write(serverfd, tpm2_success_resp, sizeof(tpm2_success_resp));
+				started = true;
+				break;
 			case TPM_ORD_GETCAPABILITY:
 				if (!memcmp(timeout_req, buffer, sizeof(timeout_req))) {
 					n = write(serverfd, timeout_res, sizeof(timeout_res));
@@ -155,7 +166,11 @@ int vtpmctrl_create(bool exit_on_user_request)
 				}
 				break;
 			default:
-				n = write(serverfd, tpm_success_resp, sizeof(tpm_success_resp));
+				if (buffer[0] == 0x80) {
+					n = write(serverfd, tpm2_success_resp, sizeof(tpm2_success_resp));
+				} else {
+					n = write(serverfd, tpm_success_resp, sizeof(tpm_success_resp));
+				}
 				break;
 			}
 			if (n < 0) {
@@ -176,11 +191,16 @@ int vtpmctrl_create(bool exit_on_user_request)
 int main(int argc, char *argv[])
 {
 	bool exit_on_user_request = false;
+	bool is_tpm2 = false;
+	int idx = 1;
 
-	if (argc > 1) {
-		if (!strcmp(argv[1], "--exit-on-user-request"))
+	while (idx < argc) {
+		if (!strcmp(argv[idx], "--exit-on-user-request"))
 			exit_on_user_request = true;
+		if (!strcmp(argv[idx], "--tpm2"))
+			is_tpm2 = true;
+		idx++;
 	}
 
-	return vtpmctrl_create(exit_on_user_request);
+	return vtpmctrl_create(exit_on_user_request, is_tpm2);
 }
