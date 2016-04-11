@@ -47,6 +47,7 @@
 #include <string.h>
 #include <endian.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #include <linux/vtpm_proxy.h>
 
@@ -54,7 +55,7 @@
 #define TPM_ORD_GETCAPABILITY  0x00000065
 
 
-int vtpmctrl_create(void)
+int vtpmctrl_create(bool exit_on_user_request)
 {
 	int fd, n, option, li, serverfd, nn;
 	struct vtpm_proxy_new_dev vtpm_new_dev = {
@@ -91,6 +92,7 @@ int vtpmctrl_create(void)
 		0x00, 0x03, 0x00, 0x00,
 	};
 	uint32_t ordinal;
+	bool started = false;
 
 	setvbuf(stdout, 0, _IONBF, 0);
 
@@ -131,6 +133,11 @@ int vtpmctrl_create(void)
 			}
 			printf("\n");
 
+			if (started && exit_on_user_request) {
+				printf("Exiting upon user sending a request\n");
+				return 0;
+			}
+
 			ordinal = be32toh(*(uint32_t *)&(buffer[6]));
 			switch (ordinal) {
 			case TPM_ORD_STARTUP:
@@ -142,6 +149,7 @@ int vtpmctrl_create(void)
 
 				} else if (!memcmp(duration_req, buffer, sizeof(duration_req))) {
 					n = write(serverfd, duration_res, sizeof(duration_res));
+					started = true;
 				} else {
 					n = write(serverfd, tpm_success_resp, sizeof(tpm_success_resp));
 				}
@@ -167,5 +175,12 @@ int vtpmctrl_create(void)
 
 int main(int argc, char *argv[])
 {
-	return vtpmctrl_create();
+	bool exit_on_user_request = false;
+
+	if (argc > 1) {
+		if (!strcmp(argv[1], "--exit-on-user-request"))
+			exit_on_user_request = true;
+	}
+
+	return vtpmctrl_create(exit_on_user_request);
 }

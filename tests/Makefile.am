@@ -9,4 +9,5 @@ check_PROGRAMS =
 TESTS = \
 	test_createmany \
 	test_createmany_checkclose \
+	test_server_exit \
 	test_vtpmctrl

@@ -1,0 +1,92 @@
+#!/bin/bash
+
+# For the license, see the LICENSE file in the root directory.
+#set -x
+
+DIR=$(dirname "$0")
+ROOT=${DIR}/..
+VTPMCTRL=${ROOT}/src/vtpmctrl
+
+tmpdir=$(mktemp -d)
+if [ $? -ne 0 ] || [ -z "$tmpdir" ]; then
+	echo "Error: Could not create temporary directory."
+	exit 1
+fi
+
+vtpmctrllog=${tmpdir}/vtpmctrl.log
+vtpmctrlpid=0
+
+cleanup() {
+	rm -rf $tmpdir
+	kill -9 $vtpmctrlpid &>/dev/null
+}
+
+trap "cleanup" EXIT
+
+if [ ! -x $VTPMCTRL ]; then
+	echo "vtpmctrl is missing at $VTPMCTRL."
+	exit 1
+fi
+
+if [ ! -x "/bin/echo" ]; then
+	echo "/bin/echo does not exist."
+	exit 1
+fi
+
+if [ $(id -u) -ne 0 ]; then
+	echo "Test must be run as root"
+	exit 77
+fi
+
+if [ ! -c /dev/vtpmx ]; then
+	modprobe tpm_vtpm_proxy
+fi
+
+if [ ! -c /dev/vtpmx ]; then
+	echo "Missing vtpm driver."
+	exit 1
+fi
+
+# have vtpmctrl terminate once we (not kernel) send a request
+$VTPMCTRL --exit-on-user-request > $vtpmctrllog &
+vtpmctrlpid=$!
+sleep 1
+
+tpmdev=$(sed -n 's/.* \(\/dev\/tpm[0-9]\+\);.*/\1/p'  $vtpmctrllog)
+
+if [ ! -c $tpmdev ]; then
+	echo "Error: TPM device $tpmdev does not exist."
+	exit 1
+fi
+
+exec 100<>$tpmdev
+if [ $? -ne 0 ]; then
+	echo "Error: Could not open $tpmdev."
+	exit 1
+fi
+
+before=$(date +%s)
+# Bash prints out 'Operation cancelled'
+/bin/echo -en '\x00\xc1\x00\x00\x00\x0a\x00\x00\x00\x00' >&100
+
+res=$(od -t x1 -An <&100)
+after=$(date +%s)
+
+if [ $((after - before)) -gt 1 ]; then
+	echo "Error: Test took too long."
+	echo "   expected duration: max. 1 second"
+	echo "   actual duration  : $((after - before)) seconds"
+	exit 1
+fi
+
+exp=""
+if [ "$res" != "$exp" ]; then
+	echo "Error: Expected result different from actual result."
+	echo "       actual:   $res"
+	echo "       expected: $exp"
+	exit 1
+fi
+
+echo "OK"
+
+exit 0
