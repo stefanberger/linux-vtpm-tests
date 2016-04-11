@@ -50,6 +50,10 @@
 
 #include <linux/vtpm_proxy.h>
 
+#define TPM_ORD_STARTUP        0x00000099
+#define TPM_ORD_GETCAPABILITY  0x00000065
+
+
 int vtpmctrl_create(void)
 {
 	int fd, n, option, li, serverfd, nn;
@@ -58,7 +62,7 @@ int vtpmctrl_create(void)
 	};
 	char tpmdev[16];
 	unsigned char buffer[4096];
-	const unsigned char tpm_startup_resp[] = {
+	const unsigned char tpm_success_resp[] = {
 		0x00, 0xc4, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00
 	};
 	const unsigned char timeout_req[] = {
@@ -126,23 +130,24 @@ int vtpmctrl_create(void)
 					printf("\n");
 			}
 			printf("\n");
+
 			ordinal = be32toh(*(uint32_t *)&(buffer[6]));
 			switch (ordinal) {
-			case 0x99:
-				n = write(serverfd, tpm_startup_resp, sizeof(tpm_startup_resp));
+			case TPM_ORD_STARTUP:
+				n = write(serverfd, tpm_success_resp, sizeof(tpm_success_resp));
 				break;
-			case 0x65:
+			case TPM_ORD_GETCAPABILITY:
 				if (!memcmp(timeout_req, buffer, sizeof(timeout_req))) {
 					n = write(serverfd, timeout_res, sizeof(timeout_res));
 
 				} else if (!memcmp(duration_req, buffer, sizeof(duration_req))) {
 					n = write(serverfd, duration_res, sizeof(duration_res));
 				} else {
-					n = write(serverfd, tpm_startup_resp, sizeof(tpm_startup_resp));
+					n = write(serverfd, tpm_success_resp, sizeof(tpm_success_resp));
 				}
 				break;
 			default:
-				n = write(serverfd, tpm_startup_resp, sizeof(tpm_startup_resp));
+				n = write(serverfd, tpm_success_resp, sizeof(tpm_success_resp));
 				break;
 			}
 			if (n < 0) {
