@@ -53,6 +53,8 @@
 
 #define TPM_ORD_STARTUP        0x00000099
 #define TPM_ORD_GETCAPABILITY  0x00000065
+#define TPM_ORD_CONTINUESELFTEST 0x00000053
+#define TPM_ORD_PCRREAD        0x00000015
 
 #define TPM2_CC_STARTUP        0x00000144
 
@@ -94,6 +96,11 @@ int vtpmctrl_create(bool exit_on_user_request, bool is_tpm2)
 		0x00, 0x01, 0x00, 0x00,
 		0x00, 0x02, 0x00, 0x00,
 		0x00, 0x03, 0x00, 0x00,
+	};
+	const unsigned char tpm_read_pcr_resp[] = {
+		0x00, 0xc4, 0x00, 0x00, 0x00, 0x1a, 0x00, 0x00, 0x00, 0x00,
+                0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
+                0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
 	};
 	uint32_t ordinal;
 	bool started = false;
@@ -140,12 +147,17 @@ int vtpmctrl_create(bool exit_on_user_request, bool is_tpm2)
 			}
 			printf("\n");
 
-			if (started && exit_on_user_request) {
+			ordinal = be32toh(*(uint32_t *)&(buffer[6]));
+
+			/* the kernel sends a variety of commands; so we won't exit on 
+			   ContinueSelfTest or PcrRead */
+			if (started && exit_on_user_request &&
+			    ordinal != TPM_ORD_CONTINUESELFTEST &&
+			    ordinal != TPM_ORD_PCRREAD) {
 				printf("Exiting upon user sending a request\n");
 				return 0;
 			}
 
-			ordinal = be32toh(*(uint32_t *)&(buffer[6]));
 			switch (ordinal) {
 			case TPM_ORD_STARTUP:
 				n = write(serverfd, tpm_success_resp, sizeof(tpm_success_resp));
@@ -165,6 +177,12 @@ int vtpmctrl_create(bool exit_on_user_request, bool is_tpm2)
 					n = write(serverfd, tpm_success_resp, sizeof(tpm_success_resp));
 				}
 				break;
+                        case TPM_ORD_CONTINUESELFTEST:
+                                n = write(serverfd, tpm_success_resp, sizeof(tpm_success_resp));
+                                break;
+                        case TPM_ORD_PCRREAD:
+                                n = write(serverfd, tpm_read_pcr_resp, sizeof(tpm_read_pcr_resp));
+                                break;
 			default:
 				if (buffer[0] == 0x80) {
 					n = write(serverfd, tpm2_success_resp, sizeof(tpm2_success_resp));
