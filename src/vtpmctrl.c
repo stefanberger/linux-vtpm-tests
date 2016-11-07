@@ -58,6 +58,19 @@
 
 #define TPM2_CC_STARTUP        0x00000144
 
+void dump_buffer(const unsigned char *buffer, int len)
+{
+	int i = 0;
+
+	while (i < len) {
+		printf("0x%02x ", buffer[i]);
+		i++;
+		if (i % 16 == 0)
+			printf("\n");
+	}
+	printf("\n");
+}
+
 int vtpmctrl_create(bool exit_on_user_request, bool is_tpm2)
 {
 	int fd, n, option, li, serverfd, nn;
@@ -138,14 +151,7 @@ int vtpmctrl_create(bool exit_on_user_request, bool is_tpm2)
 		n = read(serverfd, buffer, sizeof(buffer));
 		if (n > 0) {
 			printf("Request with %d bytes:\n", n);
-			nn = 0;
-			while (nn < n) {
-				printf("0x%02x ", buffer[nn]);
-				nn++;
-				if (nn % 16 == 0)
-					printf("\n");
-			}
-			printf("\n");
+			dump_buffer(buffer, n);
 
 			ordinal = be32toh(*(uint32_t *)&(buffer[6]));
 
