@@ -79,6 +79,8 @@ int vtpmctrl_create(bool exit_on_user_request, bool is_tpm2)
 	};
 	char tpmdev[16];
 	unsigned char buffer[4096];
+	const unsigned char *bufferp;
+	size_t bufferlen;
 	const unsigned char tpm_success_resp[] = {
 		0x00, 0xc4, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00
 	};
@@ -166,37 +168,48 @@ int vtpmctrl_create(bool exit_on_user_request, bool is_tpm2)
 
 			switch (ordinal) {
 			case TPM_ORD_STARTUP:
+			        bufferp = tpm_success_resp;
+			        bufferlen = sizeof(tpm_success_resp);
 				n = write(serverfd, tpm_success_resp, sizeof(tpm_success_resp));
 				break;
 			case TPM2_CC_STARTUP:
-				n = write(serverfd, tpm2_success_resp, sizeof(tpm2_success_resp));
+			        bufferp = tpm2_success_resp;
+			        bufferlen = sizeof(tpm2_success_resp);
 				started = true;
 				break;
 			case TPM_ORD_GETCAPABILITY:
 				if (!memcmp(timeout_req, buffer, sizeof(timeout_req))) {
-					n = write(serverfd, timeout_res, sizeof(timeout_res));
+				        bufferp = timeout_res;
+				        bufferlen = sizeof(timeout_res);
 
 				} else if (!memcmp(duration_req, buffer, sizeof(duration_req))) {
-					n = write(serverfd, duration_res, sizeof(duration_res));
+				        bufferp = duration_res;
+				        bufferlen = sizeof(duration_res);
 					started = true;
 				} else {
-					n = write(serverfd, tpm_success_resp, sizeof(tpm_success_resp));
+				        bufferp = tpm_success_resp;
+				        bufferlen = sizeof(tpm_success_resp);
 				}
 				break;
                         case TPM_ORD_CONTINUESELFTEST:
-                                n = write(serverfd, tpm_success_resp, sizeof(tpm_success_resp));
+			        bufferp = tpm_success_resp;
+			        bufferlen = sizeof(tpm_success_resp);
                                 break;
                         case TPM_ORD_PCRREAD:
-                                n = write(serverfd, tpm_read_pcr_resp, sizeof(tpm_read_pcr_resp));
+			        bufferp = tpm_read_pcr_resp;
+			        bufferlen = sizeof(tpm_read_pcr_resp);
                                 break;
 			default:
 				if (buffer[0] == 0x80) {
-					n = write(serverfd, tpm2_success_resp, sizeof(tpm2_success_resp));
+        			        bufferp = tpm2_success_resp;
+        			        bufferlen = sizeof(tpm2_success_resp);
 				} else {
-					n = write(serverfd, tpm_success_resp, sizeof(tpm_success_resp));
+        			        bufferp = tpm_success_resp;
+        			        bufferlen = sizeof(tpm_success_resp);
 				}
 				break;
 			}
+			n = write(serverfd, bufferp, bufferlen);
 			if (n < 0) {
 				printf("Error from writing the response: %s\n",
 				       strerror(errno));
@@ -204,6 +217,7 @@ int vtpmctrl_create(bool exit_on_user_request, bool is_tpm2)
 			} else {
 				printf("Sent response with %d bytes.\n", n);
 			}
+			dump_buffer(bufferp, bufferlen);
 		} else {
 			break;
 		}
