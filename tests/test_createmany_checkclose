@@ -76,8 +76,10 @@ for ((i = 0; i < 400; i++)); do
 	fi
 
 	res=$(cat /sys/devices/virtual/tpm/${tpmdev##/dev/}/durations)
-	exp="66000 132000 197000 [original]"
-	if [ "$res" != "$exp" ]; then
+	# x86   returns  66000 132000 197000
+	# ppc64 returns  68000 132000 200000
+	exp="[6-7][0-9]000 1[2-4][0-9]000 [1-2][0-9][0-9]000 \[original\]"
+	if ! [[ "$res" =~ ^${exp} ]]; then
 		echo "Error: Expected durations different from actual ones."
 		echo "       actual:   $res"
 		echo "       expected: $exp"
