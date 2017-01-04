@@ -57,16 +57,18 @@ for ((i = 0; i < 400; i++)); do
 	# test the device
 	if [ ! -c $tpmdev ]; then
 		echo "Error: TPM device $tpmdev does not exist."
+		cat $vtpmctrllog
 		exit 1
 	fi
 
 	echo -n "$tpmdev "
 
 	exec 100<>$tpmdev
-
-	/bin/echo -en '\x80\x01\x00\x00\x00\x0a\x00\x00\x00\x00' >&100
+	# Send a PCR_Reset
+	/bin/echo -en '\x80\x01\x00\x00\x00\x0a\x00\x00\x01\x3d\x00\x00\x00\x00' >&100
 	res=$(od -t x1 -An <&100)
 
+	# vtpmctrl responds with OK to this
 	exp=" 80 01 00 00 00 0a 00 00 00 00"
 	if [ "$res" != "$exp" ]; then
 		echo "Error: Expected result different from actual result."
