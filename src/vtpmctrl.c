@@ -71,6 +71,28 @@ void dump_buffer(const unsigned char *buffer, int len)
 	printf("\n");
 }
 
+int spawn_device(struct vtpm_proxy_new_dev *vtpm_new_dev)
+{
+	int fd, n;
+
+	fd = open("/dev/vtpmx", O_RDWR);
+	if (fd < 0) {
+		perror("Could not open /dev/vtpmx");
+		return 1;
+	}
+
+	n = ioctl(fd, VTPM_PROXY_IOC_NEW_DEV, vtpm_new_dev);
+	if (n != 0) {
+		perror("ioctl to create new device failed");
+		close(fd);
+		return 1;
+	}
+
+	close(fd);
+
+	return 0;
+}
+
 int vtpmctrl_create(bool exit_on_user_request, bool is_tpm2)
 {
 	int fd, n, option, li, serverfd, nn;
@@ -122,21 +144,11 @@ int vtpmctrl_create(bool exit_on_user_request, bool is_tpm2)
 
 	setvbuf(stdout, 0, _IONBF, 0);
 
-	fd = open("/dev/vtpmx", O_RDWR);
-	if (fd < 0) {
-		perror("Could not open /dev/vtpmx");
-		return 1;
-	}
-
 	if (is_tpm2)
 		vtpm_new_dev.flags |= VTPM_PROXY_FLAG_TPM2;
 
-	n = ioctl(fd, VTPM_PROXY_IOC_NEW_DEV, &vtpm_new_dev);
-	if (n != 0) {
-		perror("ioctl to create new device failed");
-		close(fd);
+	if (spawn_device(&vtpm_new_dev))
 		return 1;
-	}
 
 	snprintf(tpmdev, sizeof(tpmdev), "/dev/tpm%u",
 		 vtpm_new_dev.tpm_num);
@@ -146,8 +158,6 @@ int vtpmctrl_create(bool exit_on_user_request, bool is_tpm2)
 	printf("Created TPM device %s; vTPM device has fd %d, "
 	       "major/minor = %u/%u.\n",
 	       tpmdev, serverfd, vtpm_new_dev.major, vtpm_new_dev.minor);
-
-	close(fd);
 
 	while (1) {
 		n = read(serverfd, buffer, sizeof(buffer));
@@ -226,17 +236,60 @@ int vtpmctrl_create(bool exit_on_user_request, bool is_tpm2)
 	return 0;
 }
 
-int main(int argc, char *argv[])
+void vtpmctrl_spawn(int argc, char *argv[], char *envp[], int is_tpm2)
+{
+	const char *filename = argv[0];
+	int i;
+	char fdstr[10];
+	struct vtpm_proxy_new_dev vtpm_new_dev = {
+		.flags = 0,
+	};
+
+	if (argc < 1) {
+		fprintf(stderr, "Missing filename.\n");
+		exit(EXIT_FAILURE);
+	}
+	if (is_tpm2)
+		vtpm_new_dev.flags |= VTPM_PROXY_FLAG_TPM2;
+	if (spawn_device(&vtpm_new_dev))
+		exit(EXIT_FAILURE);
+
+	printf("Created TPM device /dev/tpm%d; vTPM device has fd %d, "
+	       "major/minor = %u/%u.\n",
+	       vtpm_new_dev.tpm_num, vtpm_new_dev.fd,
+	       vtpm_new_dev.major, vtpm_new_dev.minor);
+
+	snprintf(fdstr, sizeof(fdstr), "%d", vtpm_new_dev.fd);
+
+	for (i = 1; i < argc; i++) {
+		if (!strcmp(argv[i], "%fd")) {
+			argv[i] = fdstr;
+		}
+	}
+
+
+	execve(filename, &argv[0], envp);
+	fprintf(stderr, "Could not execve '%s' : %s",
+		filename,
+		strerror(errno));
+	/* should never get here */
+	exit(EXIT_FAILURE);
+}
+
+int main(int argc, char *argv[], char *envp[])
 {
 	bool exit_on_user_request = false;
 	bool is_tpm2 = false;
 	int idx = 1;
 
 	while (idx < argc) {
-		if (!strcmp(argv[idx], "--exit-on-user-request"))
+		if (!strcmp(argv[idx], "--exit-on-user-request")) {
 			exit_on_user_request = true;
-		if (!strcmp(argv[idx], "--tpm2"))
+		} else if (!strcmp(argv[idx], "--tpm2")) {
 			is_tpm2 = true;
+		} else if (!strcmp(argv[idx], "--spawn")) {
+			vtpmctrl_spawn(argc-1-idx, &argv[1+idx], envp, is_tpm2);
+		}
 		idx++;
 	}
 
