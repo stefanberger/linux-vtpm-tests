@@ -276,6 +276,40 @@ void vtpmctrl_spawn(int argc, char *argv[], char *envp[], int is_tpm2)
 	exit(EXIT_FAILURE);
 }
 
+static void usage(const  char *prg)
+{
+        printf(
+"This is a test tool for the Linux vTPM proxy driver\n"
+"\n"
+"Usage: %s options\n"
+"\n"
+"The following options are supported:\n"
+""
+"--tpm2                 : A TPM 2 is used\n"
+"--exit-on-user-request : The tool exits upon a request issued by\n"
+"                         the user;\n"
+"--spawn program prg-params...\n"
+"                       : Spawn the given program and pass to it the\n"
+"                         file descriptor on which to listen for TPM\n"
+"                         commands. If a parameter %fd appears among\n"
+"                         the prg-params passwd to the program, ti will\n"
+"                         be replaced by that file descriptor number.\n"
+"\n"
+"                         This option must be the last option passed.\n"
+"\n"
+"--help|-h|-?           : Display this help screen and exit.\n"
+"\n"
+"Examples:\n"
+"%s --tpm2 \\\n"
+"  --spawn /bin/swtpm chardev --tpm2 --fd %%fd --tpmstate dir=/tmp\n"
+"\n"
+"%s \\\n"
+"  --spawn /bin/swtpm chardev --fd %%fd --tpmstate dir=/tmp\n"
+"\n",
+prg, prg, prg, prg
+);
+}
+
 int main(int argc, char *argv[], char *envp[])
 {
 	bool exit_on_user_request = false;
@@ -289,6 +323,15 @@ int main(int argc, char *argv[], char *envp[])
 			is_tpm2 = true;
 		} else if (!strcmp(argv[idx], "--spawn")) {
 			vtpmctrl_spawn(argc-1-idx, &argv[1+idx], envp, is_tpm2);
+		} else if (!strcmp(argv[idx], "--help") ||
+		           !strcmp(argv[idx], "-h") ||
+		           !strcmp(argv[idx], "-?")) {
+		        usage(argv[0]);
+		        exit(EXIT_SUCCESS);
+		} else {
+		        fprintf(stderr, "Unkown option.\n");
+		        usage(argv[0]);
+		        exit(EXIT_FAILURE);
 		}
 		idx++;
 	}
