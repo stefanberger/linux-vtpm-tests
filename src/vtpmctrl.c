@@ -137,8 +137,8 @@ int vtpmctrl_create(bool exit_on_user_request, bool is_tpm2)
 	};
 	const unsigned char tpm_read_pcr_resp[] = {
 		0x00, 0xc4, 0x00, 0x00, 0x00, 0x1e, 0x00, 0x00, 0x00, 0x00,
-                0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
-                0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11
+		0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11,
+		0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11, 0x11
 	};
 	const unsigned char tpm2_pt_tot_commands[] = {
 		0x80, 0x01, 0x00, 0x00, 0x00, 0x16, 0x00, 0x00, 0x01, 0x7a,
@@ -155,16 +155,16 @@ int vtpmctrl_create(bool exit_on_user_request, bool is_tpm2)
 		0x00, 0x00, 0x00, 0x40  /* number of commands */
 	};
 	const unsigned char tpm2_pt_cc_first[] = {
-	        0x80, 0x01, 0x00, 0x00, 0x00, 0x16, 0x00, 0x00, 0x01, 0x7a,
-	        0x00, 0x00, 0x00, 0x02,
-	        0x00, 0x00, 0x01, 0x1f,
-	        0x00, 0x00, 0x00, 0x40  /* number of commands */
-        };
+		0x80, 0x01, 0x00, 0x00, 0x00, 0x16, 0x00, 0x00, 0x01, 0x7a,
+		0x00, 0x00, 0x00, 0x02,
+		0x00, 0x00, 0x01, 0x1f,
+		0x00, 0x00, 0x00, 0x40  /* number of commands */
+	};
 	const unsigned char tpm2_pt_cc_first_resp[] = {
-	        0x80, 0x01, 0x00, 0x00, 0x01, 0x13, 0x00, 0x00, 0x00, 0x00,
+		0x80, 0x01, 0x00, 0x00, 0x01, 0x13, 0x00, 0x00, 0x00, 0x00,
 		0x00,
 		0x00, 0x00, 0x00, 0x06,
-	        0x00, 0x00, 0x00, 0x40, /* number of commands */
+		0x00, 0x00, 0x00, 0x40, /* number of commands */
 		0x04, 0x40, 0x01, 0x1f,
 		0x04, 0x40, 0x01, 0x20,
 		0x02, 0xc0, 0x01, 0x21,
@@ -229,7 +229,7 @@ int vtpmctrl_create(bool exit_on_user_request, bool is_tpm2)
 		0x10, 0x00, 0x01, 0x61,
 		0x02, 0x00, 0x01, 0x62,
 		0x02, 0x00, 0x01, 0x63,
-        };
+	};
 	uint32_t ordinal;
 	bool started = false;
 
@@ -270,55 +270,55 @@ int vtpmctrl_create(bool exit_on_user_request, bool is_tpm2)
 
 			switch (ordinal) {
 			case TPM_ORD_STARTUP:
-			        bufferp = tpm_success_resp;
-			        bufferlen = sizeof(tpm_success_resp);
+				bufferp = tpm_success_resp;
+				bufferlen = sizeof(tpm_success_resp);
 				n = write(serverfd, tpm_success_resp, sizeof(tpm_success_resp));
 				break;
 			case TPM2_CC_STARTUP:
-			        bufferp = tpm2_success_resp;
-			        bufferlen = sizeof(tpm2_success_resp);
+				bufferp = tpm2_success_resp;
+				bufferlen = sizeof(tpm2_success_resp);
 				started = true;
 				break;
 			case TPM_ORD_GETCAPABILITY:
 				if (!memcmp(timeout_req, buffer, sizeof(timeout_req))) {
-				        bufferp = timeout_res;
-				        bufferlen = sizeof(timeout_res);
+					bufferp = timeout_res;
+					bufferlen = sizeof(timeout_res);
 
 				} else if (!memcmp(duration_req, buffer, sizeof(duration_req))) {
-				        bufferp = duration_res;
-				        bufferlen = sizeof(duration_res);
+					bufferp = duration_res;
+					bufferlen = sizeof(duration_res);
 					started = true;
 				} else {
-				        bufferp = tpm_success_resp;
-				        bufferlen = sizeof(tpm_success_resp);
+					bufferp = tpm_success_resp;
+					bufferlen = sizeof(tpm_success_resp);
 				}
 				break;
-                        case TPM_ORD_CONTINUESELFTEST:
-			        bufferp = tpm_success_resp;
-			        bufferlen = sizeof(tpm_success_resp);
-                                break;
-                        case TPM_ORD_PCRREAD:
-			        bufferp = tpm_read_pcr_resp;
-			        bufferlen = sizeof(tpm_read_pcr_resp);
-                                break;
-                        case TPM2_CC_GET_CAPABILITY:
-                                if (!memcmp(tpm2_pt_tot_commands, buffer, sizeof(tpm2_pt_tot_commands))) {
-                                        bufferp = tpm2_pt_tot_commands_resp;
-                                        bufferlen = sizeof(tpm2_pt_tot_commands_resp);
-                                } else if (!memcmp(tpm2_pt_cc_first, buffer, sizeof(tpm2_pt_cc_first))) {
-                                        bufferp = tpm2_pt_cc_first_resp;
-                                        bufferlen = sizeof(tpm2_pt_cc_first_resp);
-                                } else {
-                                        printf("Unknown TPM2_CC_GET_CAPABILITY request\n");
-                                }
-                                break;
+			case TPM_ORD_CONTINUESELFTEST:
+				bufferp = tpm_success_resp;
+				bufferlen = sizeof(tpm_success_resp);
+				break;
+			case TPM_ORD_PCRREAD:
+				bufferp = tpm_read_pcr_resp;
+				bufferlen = sizeof(tpm_read_pcr_resp);
+				break;
+			case TPM2_CC_GET_CAPABILITY:
+				if (!memcmp(tpm2_pt_tot_commands, buffer, sizeof(tpm2_pt_tot_commands))) {
+					bufferp = tpm2_pt_tot_commands_resp;
+					bufferlen = sizeof(tpm2_pt_tot_commands_resp);
+				} else if (!memcmp(tpm2_pt_cc_first, buffer, sizeof(tpm2_pt_cc_first))) {
+					bufferp = tpm2_pt_cc_first_resp;
+					bufferlen = sizeof(tpm2_pt_cc_first_resp);
+				} else {
+					printf("Unknown TPM2_CC_GET_CAPABILITY request\n");
+				}
+				break;
 			default:
 				if (buffer[0] == 0x80) {
-        			        bufferp = tpm2_success_resp;
-        			        bufferlen = sizeof(tpm2_success_resp);
+					bufferp = tpm2_success_resp;
+					bufferlen = sizeof(tpm2_success_resp);
 				} else {
-        			        bufferp = tpm_success_resp;
-        			        bufferlen = sizeof(tpm_success_resp);
+					bufferp = tpm_success_resp;
+					bufferlen = sizeof(tpm_success_resp);
 				}
 				break;
 			}
@@ -332,10 +332,10 @@ int vtpmctrl_create(bool exit_on_user_request, bool is_tpm2)
 			}
 			dump_buffer(bufferp, bufferlen);
 		} else {
-		        printf("Did not receive data from read() ; n=%d ", n);
-		        if (n < 0) {
-		                printf(": %s\n", strerror(errno));
-		        }
+			printf("Did not receive data from read() ; n=%d ", n);
+			if (n < 0) {
+				printf(": %s\n", strerror(errno));
+			}
 			break;
 		}
 	}
@@ -387,7 +387,7 @@ void vtpmctrl_spawn(int argc, char *argv[], char *envp[], int is_tpm2)
 
 static void usage(const  char *prg)
 {
-        printf(
+	printf(
 "This is a test tool for the Linux vTPM proxy driver\n"
 "\n"
 "Usage: %s options\n"
@@ -434,14 +434,14 @@ int main(int argc, char *argv[], char *envp[])
 		} else if (!strcmp(argv[idx], "--spawn")) {
 			vtpmctrl_spawn(argc-1-idx, &argv[1+idx], envp, is_tpm2);
 		} else if (!strcmp(argv[idx], "--help") ||
-		           !strcmp(argv[idx], "-h") ||
-		           !strcmp(argv[idx], "-?")) {
-		        usage(argv[0]);
-		        exit(EXIT_SUCCESS);
+			   !strcmp(argv[idx], "-h") ||
+			   !strcmp(argv[idx], "-?")) {
+			usage(argv[0]);
+			exit(EXIT_SUCCESS);
 		} else {
-		        fprintf(stderr, "Unkown option.\n");
-		        usage(argv[0]);
-		        exit(EXIT_FAILURE);
+			fprintf(stderr, "Unkown option.\n");
+			usage(argv[0]);
+			exit(EXIT_FAILURE);
 		}
 		idx++;
 	}
