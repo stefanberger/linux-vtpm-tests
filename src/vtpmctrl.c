@@ -375,6 +375,8 @@ int vtpmctrl_create(bool exit_on_user_request, bool is_tpm2)
 					printf("*** Unknown TPM2_CC_GET_CAPABILITY request\n");
 				}
 				break;
+			case TPM_ORD_SET_LOCALITY:
+			/*case TPM2_CC_SET_LOCALITY:*/
 			default:
 				if (buffer[0] == 0x80) {
 					bufferp = tpm2_success_resp;

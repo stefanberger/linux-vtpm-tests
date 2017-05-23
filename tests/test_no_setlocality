@@ -1,0 +1,139 @@
+#!/bin/bash
+
+# Test that a user cannot send the driver specific command to set the locality
+
+# For the license, see the LICENSE file in the root directory.
+#set -x
+
+DIR=$(dirname "$0")
+ROOT=${DIR}/..
+VTPMCTRL=${ROOT}/src/vtpmctrl
+
+tmpdir=$(mktemp -d)
+if [ $? -ne 0 ] || [ -z "$tmpdir" ]; then
+	echo "Error: Could not create temporary directory."
+	exit 1
+fi
+
+cleanup() {
+	rm -rf $tmpdir
+	trap - SIGTERM
+	kill $(jobs -p)
+}
+
+# wait for a char device to appear
+# @param1: device name
+# @param2: timeout in s
+wait_for_device() {
+	local dev="$1"
+	local to="$2"
+
+	while [ $to -ge 0 ] && [ ! -c ${dev} ]; do
+		sleep 1
+		to=$((to-1))
+	done
+
+	if [ -c ${dev} ]; then
+		return 0
+	fi
+	return 1
+}
+
+trap "cleanup" EXIT
+
+if [ ! -x $VTPMCTRL ]; then
+	echo "vtpmctrl is missing at $VTPMCTRL."
+	exit 1
+fi
+
+if [ $(id -u) -ne 0 ]; then
+	echo "Test must be run as root"
+	exit 77
+fi
+
+if [ ! -c /dev/vtpmx ]; then
+	modprobe tpm_vtpm_proxy
+fi
+
+if [ ! -c /dev/vtpmx ]; then
+	echo "Missing vtpm driver."
+	exit 1
+fi
+
+vtpmctrllog=$tmpdir/vtpmctrl.log
+$VTPMCTRL > $vtpmctrllog &
+sleep 1
+tpmdev=$(cat $vtpmctrllog | sed -n 's/.* \(\/dev\/tpm[0-9]\+\);.*/\1/p')
+
+# test the device
+wait_for_device $tpmdev 5
+if [ $? -ne 0 ]; then
+	echo "Error: TPM 1.2 device $tpmdev does not exist."
+	exit 1
+fi
+
+exec 100<>$tpmdev
+
+/bin/echo -en '\x00\xc1\x00\x00\x00\x0b\x20\x00\x10\x00\x01' >&100
+res=$(od -t x1 -An <&100)
+
+exp=""
+if [ "$res" != "$exp" ]; then
+	echo "Error: Expected result different from actual result."
+	echo "       actual:   $res"
+	echo "       expected: $exp"
+	exit 1
+fi
+echo " OK TPM 1.2 $tpmdev"
+
+exec 100>&-
+
+vtpmctrllog=$tmpdir/vtpmctrl.log
+$VTPMCTRL --tpm2 > ${vtpmctrllog} &
+sleep 1
+tpmdev=$(cat $vtpmctrllog | sed -n 's/.* \(\/dev\/tpm[0-9]\+\);.*/\1/p')
+
+# test the device
+wait_for_device $tpmdev 5
+if [ $? -ne 0 ]; then
+	echo "Error: TPM 2 device $tpmdev does not exist."
+	exit 1
+fi
+
+exec 100<>$tpmdev
+
+/bin/echo -en '\x80\x00\x00\x00\x00\x0b\x20\x00\x10\x00\x00' >&100
+res=$(od -t x1 -An <&100)
+
+exp=""
+if [ "$res" != "$exp" ]; then
+	echo "Error: Expected result different from actual result."
+	echo "       actual:   $res"
+	echo "       expected: $exp"
+	exit 1
+fi
+
+echo " OK TPM 2 $tpmdev"
+
+exec 100>&-
+
+# Check the TPM 2 resource manager device if it exists
+devnum=$(echo $tpmdev | sed -n 's|/dev/tpm\([0-9]*\)|\1|p')
+tpmdevrm="/dev/tpmrm${devnum}"
+if [ -c $tpmdevrm ]; then
+	exec 100<>$tpmdevrm
+
+	/bin/echo -en '\x80\x00\x00\x00\x00\x0b\x20\x00\x10\x00\x00' >&100
+	res=$(od -t x1 -An <&100)
+
+	exp=""
+	if [ "$res" != "$exp" ]; then
+		echo "Error: Expected result different from actual result."
+		echo "       actual:   $res"
+		echo "       expected: $exp"
+		exit 1
+	fi
+	echo " OK TPM 2 $tpmdevrm"
+
+	exec 100>&-
+fi
