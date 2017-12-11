@@ -73,9 +73,13 @@ if [ $? -ne 0 ]; then
 fi
 
 exec 100<>$tpmdev
+if [ $? -ne 0 ]; then
+	echo "Error: Could not open $tpmdev"
+	exit 1
+fi
 
 /bin/echo -en '\x00\xc1\x00\x00\x00\x0b\x20\x00\x10\x00\x01' >&100
-res=$(od -t x1 -An <&100)
+res=$(od -t x1 -An -w256 <&100)
 
 exp=""
 if [ "$res" != "$exp" ]; then
@@ -103,7 +107,7 @@ fi
 exec 100<>$tpmdev
 
 /bin/echo -en '\x80\x00\x00\x00\x00\x0b\x20\x00\x10\x00\x00' >&100
-res=$(od -t x1 -An <&100)
+res=$(od -t x1 -An -w256 <&100)
 
 exp=""
 if [ "$res" != "$exp" ]; then
@@ -122,18 +126,27 @@ devnum=$(echo $tpmdev | sed -n 's|/dev/tpm\([0-9]*\)|\1|p')
 tpmdevrm="/dev/tpmrm${devnum}"
 if [ -c $tpmdevrm ]; then
 	exec 100<>$tpmdevrm
+	if [ $? -ne 0 ]; then
+		echo "Error: Could not open $tpmdevrm."
+		exit 1
+	fi
 
 	/bin/echo -en '\x80\x00\x00\x00\x00\x0b\x20\x00\x10\x00\x00' >&100
-	res=$(od -t x1 -An <&100)
+	res=$(od -t x1 -An -w256 <&100)
 
 	exp=""
-	if [ "$res" != "$exp" ]; then
-		echo "Error: Expected result different from actual result."
+	# newer version of RM seem to return different result
+	exp2=" 80 01 00 00 00 0a 00 0b 01 43"
+	if [ "$res" != "$exp" ] && [ "${res:0:30}" != "$exp2" ]; then
+		echo "Error: Resource Manager: Expected result different from actual result."
 		echo "       actual:   $res"
 		echo "       expected: $exp"
+		echo "    or expected: $exp2   (versus ${res:0:30})"
 		exit 1
 	fi
 	echo " OK TPM 2 $tpmdevrm"
 
 	exec 100>&-
 fi
+
+exit 0
