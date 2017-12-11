@@ -55,6 +55,7 @@
 #define TPM_ORD_GETCAPABILITY  0x00000065
 #define TPM_ORD_CONTINUESELFTEST 0x00000053
 #define TPM_ORD_PCRREAD        0x00000015
+#define TPM_ORD_GETRANDOM      0x00000046
 
 #define TPM2_CC_STARTUP        0x00000144
 #define TPM2_CC_GET_CAPABILITY 0x0000017A
@@ -103,6 +104,8 @@ int vtpmctrl_create(bool exit_on_user_request, bool is_tpm2)
 	char tpmdev[16];
 	unsigned char buffer[4096];
 	const unsigned char *bufferp;
+	unsigned char *mybufferp;
+	bool buffer_free = false;
 	size_t bufferlen;
 	const unsigned char tpm_success_resp[] = {
 		0x00, 0xc4, 0x00, 0x00, 0x00, 0x0a, 0x00, 0x00, 0x00, 0x00
@@ -290,8 +293,9 @@ int vtpmctrl_create(bool exit_on_user_request, bool is_tpm2)
 	        0x00, 0x0b, 0x03 ,0xff, 0xff, 0xff,
 	        0x00, 0x0c, 0x03, 0xff, 0xff, 0xff,
 	};
-	uint32_t ordinal;
+	uint32_t ordinal, numbytes;
 	bool started = false;
+	unsigned int i;
 
 	setvbuf(stdout, 0, _IONBF, 0);
 
@@ -323,8 +327,9 @@ int vtpmctrl_create(bool exit_on_user_request, bool is_tpm2)
 			if (started && exit_on_user_request &&
 			    ordinal != TPM_ORD_CONTINUESELFTEST &&
 			    ordinal != TPM_ORD_PCRREAD &&
-			    ordinal != TPM2_CC_GET_CAPABILITY) {
-				printf("Exiting upon user sending a request\n");
+			    ordinal != TPM2_CC_GET_CAPABILITY &&
+			    ordinal != TPM_ORD_GETRANDOM) {
+				printf("Exiting upon user sending a request with ordinal 0x%08x.\n", ordinal);
 				return 0;
 			}
 
@@ -352,6 +357,20 @@ int vtpmctrl_create(bool exit_on_user_request, bool is_tpm2)
 					bufferp = tpm_success_resp;
 					bufferlen = sizeof(tpm_success_resp);
 				}
+				break;
+                        case TPM_ORD_GETRANDOM:
+				numbytes = be32toh(*(uint32_t *)&(buffer[10]));
+				bufferlen = 10 + numbytes;
+				bufferp = mybufferp = calloc(bufferlen, 1);
+				if (!bufferp) {
+					fprintf(stderr, "Could not allocate %u bytes\n", bufferlen);
+					exit(1);
+				}
+				mybufferp[1] = 0xc4;
+				*((uint32_t *)&mybufferp[2]) = htobe32(bufferlen);
+				for (i = 0; i < numbytes; i++)
+					mybufferp[10 + i] = i & 0xff;
+				buffer_free = true;
 				break;
 			case TPM_ORD_CONTINUESELFTEST:
 				bufferp = tpm_success_resp;
@@ -396,6 +415,10 @@ int vtpmctrl_create(bool exit_on_user_request, bool is_tpm2)
 				printf("Sent response with %d bytes.\n", n);
 			}
 			dump_buffer(bufferp, bufferlen);
+			if (buffer_free) {
+				free(mybufferp);
+				buffer_free = false;
+			}
 		} else {
 			printf("Did not receive data from read() ; n=%d ", n);
 			if (n < 0) {
