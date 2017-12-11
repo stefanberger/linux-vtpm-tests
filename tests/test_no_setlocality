@@ -9,6 +9,8 @@ DIR=$(dirname "$0")
 ROOT=${DIR}/..
 VTPMCTRL=${ROOT}/src/vtpmctrl
 
+source "${DIR}/common.sh"
+
 tmpdir=$(mktemp -d)
 if [ $? -ne 0 ] || [ -z "$tmpdir" ]; then
 	echo "Error: Could not create temporary directory."
@@ -19,24 +21,6 @@ cleanup() {
 	rm -rf $tmpdir
 	trap - SIGTERM
 	kill $(jobs -p)
-}
-
-# wait for a char device to appear
-# @param1: device name
-# @param2: timeout in s
-wait_for_device() {
-	local dev="$1"
-	local to="$2"
-
-	while [ $to -ge 0 ] && [ ! -c ${dev} ]; do
-		sleep 1
-		to=$((to-1))
-	done
-
-	if [ -c ${dev} ]; then
-		return 0
-	fi
-	return 1
 }
 
 trap "cleanup" EXIT
