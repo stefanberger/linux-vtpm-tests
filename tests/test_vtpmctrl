@@ -7,6 +7,8 @@ DIR=$(dirname "$0")
 ROOT=${DIR}/..
 VTPMCTRL=${ROOT}/src/vtpmctrl
 
+source "${DIR}/common.sh"
+
 tmpdir=$(mktemp -d)
 if [ $? -ne 0 ] || [ -z "$tmpdir" ]; then
 	echo "Error: Could not create temporary directory."
@@ -48,7 +50,8 @@ sleep 1
 
 tpmdev=$(cat $vtpmctrllog | sed -n 's/.* \(\/dev\/tpm[0-9]\+\);.*/\1/p')
 
-if [ ! -c $tpmdev ]; then
+wait_for_device $tpmdev 5
+if [ $? -ne 0 ]; then
 	echo "Error: TPM device $tpmdev does not exist."
 	exit 1
 fi
