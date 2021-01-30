@@ -499,10 +499,12 @@ static void usage(const  char *prg)
 "\n"
 "Examples:\n"
 "%s --tpm2 \\\n"
-"  --spawn /bin/swtpm chardev --tpm2 --fd %%fd --tpmstate dir=/tmp\n"
+"  --spawn /bin/swtpm chardev --tpm2 --fd %%fd --tpmstate dir=/tmp \\\n"
+"                     --flags not-need-init --locality allow-set-locality\n"
 "\n"
 "%s \\\n"
-"  --spawn /bin/swtpm chardev --fd %%fd --tpmstate dir=/tmp\n"
+"  --spawn /bin/swtpm chardev --fd %%fd --tpmstate dir=/tmp \\\n"
+"                     --flags not-need-init --locality allow-set-locality\n"
 "\n",
 prg, prg, prg, prg
 );
