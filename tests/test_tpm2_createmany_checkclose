@@ -87,7 +87,7 @@ for ((i = 0; i < 400; i++)); do
 	fi
 
 	kill -9 $(cat $tmpdir/vtpmctrl.pid.${i})
-	for ((j = 0; j < 10; j++)); do
+	for ((j = 0; j < 30; j++)); do
 		# wait for device to disappear
 		if [ ! -c $tpmdev ]; then
 			break;
