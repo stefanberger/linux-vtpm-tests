@@ -20,3 +20,4 @@ m4/
 src/vtpmctrl
 tests/*.log
 tests/*.trs
+tests/test_openmany_noclose
